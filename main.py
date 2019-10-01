@@ -1,47 +1,81 @@
 # -*- coding: utf-8-unix ; tab-width: 2 -*-
 # Version: Python 3.6.7
 
-### Imports
+### System modules
 from websocket_server import WebsocketServer
 import base64
+import numpy as np
 from tensorflow.keras.models import load_model#,Model
-from tensorflow import get_default_graph
+from tensorflow.keras.preprocessing.image import load_img, img_to_array, array_to_img
+####from tensorflow import get_default_graph
 
-from BaumCutter import BaumCutter
+### User modules
+from CutterControl import CutterControl
 
-### Global variables
-server = WebsocketServer( 8080, "10.10.10.11" )
-#server = WebsocketServer( 8080, "192.168.0.10" )
 
+### Global instances
+#server = WebsocketServer( 8080, "10.10.10.11" )   # Ethernet
+server = WebsocketServer( 8080, "192.168.0.10" )   # WiFi
+
+### Global flags
 IsRecievingFacesNow = False
 TotalNumberOfFaces = 0
 RecievedNumberOfFaces = 0
 
-# modelName = "saved_model.h5"
-# model = load_model(modelName)
+### Global variables
+####model = load_model( "saved_model.h5" )
+####global graph
+####graph = get_default_graph()
 
 ### FAIRCUT-Server functions
-def onCompleteRevieveFaces():
+def onCompleteRevieveFaces():  
   print( "Complete recieving face images!\n" )
-  
-  # Add cutting processes here
   users = TotalNumberOfFaces
-  cutter = BaumCutter( users )
-  cutter.execCutting()
+  
+  ## Init:  #cutter = BaumCutter( users )
+  usersArray = range( users )
+  xArray = []
+  
+  # Get images from saved pictures
+  for user in usersArray:
+    imgfile = "image_#" + str( user ) + ".png"
+    img = load_img( imgfile, target_size=( 224, 224 ) )
+    img_array = img_to_array( img )
+    xArray.append( img_array )
+    
+  xArray = np.array( xArray )
+  xArray = xArray.astype( "float32" ) / 255.0
+  
+  ##Exec:   #cutter.execCutting()
+  # Predict
+  ration = []
+  ####global graph
+  ####with graph.as_default():
+  model = load_model( "saved_model.h5" )
+  predicted = model.predict( xArray )#, batch_size=None, verbose=0, steps=None )
+  print(predicted)
+  for user in usersArray:
+    ration.append( predicted[user].argmax() )
+  print( ration )
+  
+  ## Cutter
+  cutter = CutterControl()
+  percentages = cutter.convertRation2Percent( ration )
+  cutter.send_message_to_mbed( percentages )
+  message4mac = cutter.message_to_mac( percentages )
   
   # Send BMI-percentages to Mac
-  print(cutter.message2mac)
-  server.send_message_to_all( cutter.message2mac )
-  #server.send_message_to_all( "BMI:40,30,20,10" )
+  print( message4mac )
+  server.send_message_to_all( message4mac )
+  #server.send_message_to_all( "BMI:40,30,20,10" )    # test string
   
-
 def BeginTransmissionForFaces( message ):
   global IsRecievingFacesNow
   global TotalNumberOfFaces
   global RecievedNumberOfFaces
   
   IsRecievingFacesNow = True
-  TotalNumberOfFaces = int(message[-1])
+  TotalNumberOfFaces = int( message[-1] )
   RecievedNumberOfFaces = 0
   print( "Begin" )
 
@@ -49,13 +83,13 @@ def EndTransmissionForFaces( message ):
   global IsRecievingFacesNow
   global TotalNumberOfFaces
   global RecievedNumberOfFaces
-
+  
   onCompleteRevieveFaces()
   
   IsRecievingFacesNow = False
   TotalNumberOfFaces = 0
   RecievedNumberOfFaces = 0
-
+  
   print( "End" )
 
 def StoreFaceDataAsPNG( message ):
@@ -65,6 +99,8 @@ def StoreFaceDataAsPNG( message ):
     fh.write( base64.b64decode( message ) )
     RecievedNumberOfFaces = RecievedNumberOfFaces + 1
     print( "Saved: image_#" + str( RecievedNumberOfFaces ) + ".png" )
+
+
 
 ### WebSockets callbacks
 def ws_new_client( client, server ):
@@ -80,7 +116,7 @@ def ws_message_received( client, server, message ):
     
   elif "EndTransmissionForFaces" == message:
     EndTransmissionForFaces( message )
-
+    
   elif len( message ) > 200:
     if IsRecievingFacesNow:
       StoreFaceDataAsPNG( message )
@@ -88,11 +124,9 @@ def ws_message_received( client, server, message ):
   else:
     print( "Client(%d) said unknown message: %s" % ( client['id'], message ) )
     
-
+    
 ### Main function 
-def main():
-  
-	
+def main():  
   server.set_fn_new_client( ws_new_client ) 
   server.set_fn_client_left( ws_client_left ) 
   server.set_fn_message_received( ws_message_received )
