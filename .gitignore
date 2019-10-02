@@ -1,5 +1,7 @@
 # Git 除外リスト
 
+image_#*
+
 # Emacs
 # -*- mode: gitignore; -*-
 *~
