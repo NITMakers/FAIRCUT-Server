@@ -29,8 +29,6 @@ RecievedNumberOfFaces = 0
 def onCompleteRevieveFaces( sess, graph, model ):
   print( "Complete recieving face images!\n" )
   users = TotalNumberOfFaces
-  
-  ## Init:  #cutter = BaumCutter( users )
   usersArray = range( users )
   xArray = []
   
@@ -44,7 +42,6 @@ def onCompleteRevieveFaces( sess, graph, model ):
   xArray = np.array( xArray )
   xArray = xArray.astype( "float32" ) / 255.0
   
-  ##Exec:   #cutter.execCutting()
   # Predict
   ration = []
 
@@ -129,8 +126,7 @@ def ws_message_received( client, server, message, sess, graph, model ):
 ### Main function 
 def main():
   # Load the model
-  #clear_session()
-  #sess = tf.Session()
+  clear_session()
   config = tf.ConfigProto(
     gpu_options=tf.GPUOptions(
       visible_device_list="",
