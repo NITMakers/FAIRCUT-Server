@@ -7,7 +7,9 @@ import base64
 import numpy as np
 from tensorflow.keras.models import load_model#,Model
 from tensorflow.keras.preprocessing.image import load_img, img_to_array, array_to_img
-####from tensorflow import get_default_graph
+
+import tensorflow as tf
+from tensorflow.keras.backend import set_session, clear_session
 
 ### User modules
 from CutterControl import CutterControl
@@ -22,13 +24,9 @@ IsRecievingFacesNow = False
 TotalNumberOfFaces = 0
 RecievedNumberOfFaces = 0
 
-### Global variables
-####model = load_model( "saved_model.h5" )
-####global graph
-####graph = get_default_graph()
 
 ### FAIRCUT-Server functions
-def onCompleteRevieveFaces():  
+def onCompleteRevieveFaces( sess, graph, model ):
   print( "Complete recieving face images!\n" )
   users = TotalNumberOfFaces
   
@@ -49,14 +47,17 @@ def onCompleteRevieveFaces():
   ##Exec:   #cutter.execCutting()
   # Predict
   ration = []
-  ####global graph
-  ####with graph.as_default():
-  model = load_model( "saved_model.h5" )
-  predicted = model.predict( xArray )#, batch_size=None, verbose=0, steps=None )
-  print(predicted)
-  for user in usersArray:
-    ration.append( predicted[user].argmax() )
-  print( ration )
+
+  set_session( sess )
+  with sess.as_default():
+    with graph.as_default():
+      #model = load_model( "saved_model.h5" )
+      predicted = model.predict( xArray, batch_size=None, verbose=1, steps=None )
+      print(predicted)
+      for user in usersArray:
+        ration.append( predicted[user].argmax() )
+      print( ration )
+  clear_session()
   
   ## Cutter
   cutter = CutterControl()
@@ -79,12 +80,12 @@ def BeginTransmissionForFaces( message ):
   RecievedNumberOfFaces = 0
   print( "Begin" )
 
-def EndTransmissionForFaces( message ):
+def EndTransmissionForFaces( message, sess, graph, model ):
   global IsRecievingFacesNow
   global TotalNumberOfFaces
   global RecievedNumberOfFaces
   
-  onCompleteRevieveFaces()
+  onCompleteRevieveFaces( sess, graph, model )
   
   IsRecievingFacesNow = False
   TotalNumberOfFaces = 0
@@ -110,12 +111,12 @@ def ws_new_client( client, server ):
 def ws_client_left( client, server ):
   print( "Client(%d) disconnected" % client['id'])
 
-def ws_message_received( client, server, message ):
+def ws_message_received( client, server, message, sess, graph, model ):
   if "BeginTransmissionForFaces" in message:
     BeginTransmissionForFaces( message )
     
   elif "EndTransmissionForFaces" == message:
-    EndTransmissionForFaces( message )
+    EndTransmissionForFaces( message, sess, graph, model )
     
   elif len( message ) > 200:
     if IsRecievingFacesNow:
@@ -126,13 +127,28 @@ def ws_message_received( client, server, message ):
     
     
 ### Main function 
-def main():  
+def main():
+  # Load the model
+  #clear_session()
+  #sess = tf.Session()
+  config = tf.ConfigProto(
+    gpu_options=tf.GPUOptions(
+      visible_device_list="",
+      allow_growth=True,
+      per_process_gpu_memory_fraction=0.4
+    )
+  )
+  sess = tf.Session( config=config )
+  set_session( sess )
+  model = load_model( "saved_model.h5" )
+  model._make_predict_function()
+  graph = tf.get_default_graph()
+  
   server.set_fn_new_client( ws_new_client ) 
   server.set_fn_client_left( ws_client_left ) 
-  server.set_fn_message_received( ws_message_received )
+  server.set_fn_message_received( lambda c, s, m, sess=sess, graph=graph, model = model: ws_message_received( c, s, m, sess, graph, model ) )
   server.run_forever()
 
 
 if __name__ == "__main__":
   main()
-  
