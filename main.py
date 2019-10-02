@@ -48,7 +48,6 @@ def onCompleteRevieveFaces( sess, graph, model ):
   set_session( sess )
   with sess.as_default():
     with graph.as_default():
-      #model = load_model( "saved_model.h5" )
       predicted = model.predict( xArray, batch_size=None, verbose=1, steps=None )
       print(predicted)
       for user in usersArray:
@@ -81,6 +80,9 @@ def EndTransmissionForFaces( message, sess, graph, model ):
   global IsRecievingFacesNow
   global TotalNumberOfFaces
   global RecievedNumberOfFaces
+
+  cutter = CutterControl()
+  cutter.tell_mbed_started_predicting()
   
   onCompleteRevieveFaces( sess, graph, model )
   
@@ -90,7 +92,9 @@ def EndTransmissionForFaces( message, sess, graph, model ):
   
   print( "End" )
 
+
 def StoreFaceDataAsPNG( message ):
+  global TotalNumberOfFaces
   global RecievedNumberOfFaces
   
   with open( "image_#" + str( RecievedNumberOfFaces ) + ".png", "wb" )  as fh:
@@ -98,12 +102,19 @@ def StoreFaceDataAsPNG( message ):
     RecievedNumberOfFaces = RecievedNumberOfFaces + 1
     print( "Saved: image_#" + str( RecievedNumberOfFaces ) + ".png" )
 
+    cutter = CutterControl()
+    cutter.tell_mbed_received_face( RecievedNumberOfFaces, TotalNumberOfFaces )
+    
+
 
 
 ### WebSockets callbacks
 def ws_new_client( client, server ):
   print( "New client connected and was given id %d" % client['id'] )
-  #server.send_message_to_all( "Hey all, a new client has joined us" ) 
+  #server.send_message_to_all( "Hey all, a new client has joined us" )
+
+  cutter = CutterControl()
+  cutter.tell_mbed_the_model_was_loaded()
 
 def ws_client_left( client, server ):
   print( "Client(%d) disconnected" % client['id'])
@@ -111,6 +122,7 @@ def ws_client_left( client, server ):
 def ws_message_received( client, server, message, sess, graph, model ):
   if "BeginTransmissionForFaces" in message:
     BeginTransmissionForFaces( message )
+    
     
   elif "EndTransmissionForFaces" == message:
     EndTransmissionForFaces( message, sess, graph, model )
@@ -125,6 +137,9 @@ def ws_message_received( client, server, message, sess, graph, model ):
     
 ### Main function 
 def main():
+  cutter = CutterControl()
+  cutter.tell_mbed_the_model_was_not_loaded()
+  
   # Load the model
   clear_session()
   config = tf.ConfigProto(
@@ -140,6 +155,9 @@ def main():
   model._make_predict_function()
   graph = tf.get_default_graph()
   
+  cutter.tell_mbed_the_model_was_loaded()
+
+  # Launch a websocket server
   server.set_fn_new_client( ws_new_client ) 
   server.set_fn_client_left( ws_client_left ) 
   server.set_fn_message_received( lambda c, s, m, sess=sess, graph=graph, model = model: ws_message_received( c, s, m, sess, graph, model ) )

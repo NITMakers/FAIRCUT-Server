@@ -42,3 +42,81 @@ class CutterControl:
     with serial.Serial( '/dev/ttyS0', 112500 ) as ser:
       ser.write( ba )
 
+  def tell_mbed_the_model_was_not_loaded( self ):
+    ba = bytearray()
+    ba.append( ord( '@' ) )
+    ba.append( 11 )
+    checksum = 0
+    ba.append( 5 )
+    checksum = checksum + 5
+    
+    for i in range( 10 ):
+      ba.append( 0 )
+      checksum = checksum + 0
+    
+    ba.append( checksum & 0xFF )
+    ba.append( ord( "\n" ) )
+    
+    with serial.Serial( '/dev/ttyS0', 112500 ) as ser:
+      ser.write( ba )
+
+  def tell_mbed_the_model_was_loaded( self ):
+    ba = bytearray()
+    ba.append( ord( '@' ) )
+    ba.append( 11 )
+    checksum = 0
+    ba.append( 6 )
+    checksum = checksum + 6
+    
+    for i in range( 10 ):
+      ba.append( 0 )
+      checksum = checksum + 0
+    
+    ba.append( checksum & 0xFF )
+    ba.append( ord( "\n" ) )
+    
+    with serial.Serial( '/dev/ttyS0', 112500 ) as ser:
+      ser.write( ba )
+
+  def tell_mbed_received_face( self, number, total ):
+    ba = bytearray()
+    ba.append( ord( '@' ) )
+    ba.append( 11 )
+    checksum = 0
+    ba.append( 7 )
+    checksum = checksum + 7
+
+    ba.append( number )
+    checksum = checksum + number
+
+    ba.append( total )
+    checksum = checksum + total
+    
+    for i in range( 10 - 2 ):
+      ba.append( 0 )
+      checksum = checksum + 0
+    
+    ba.append( checksum & 0xFF )
+    ba.append( ord( "\n" ) )
+    
+    with serial.Serial( '/dev/ttyS0', 112500 ) as ser:
+      ser.write( ba )
+
+  def tell_mbed_started_predicting( self ):
+    ba = bytearray()
+    ba.append( ord( '@' ) )
+    ba.append( 11 )
+    checksum = 0
+    ba.append( 8 )
+    checksum = checksum + 8
+    
+    for i in range( 10 ):
+      ba.append( 0 )
+      checksum = checksum + 0
+    
+    ba.append( checksum & 0xFF )
+    ba.append( ord( "\n" ) )
+    
+    with serial.Serial( '/dev/ttyS0', 112500 ) as ser:
+      ser.write( ba )
+
