@@ -2,6 +2,12 @@
 # Version: Python 3.6.7
 
 ### System modules
+import sys
+sys.path.append('/home/chihiro/.pyenv/versions/3.6.7/lib/python3.6')
+sys.path.append('/home/chihiro/.pyenv/versions/3.6.7/lib/python3.6/lib-dynload')
+sys.path.append('/home/chihiro/.pyenv/versions/3.6.7/lib/python3.6/site-packages')
+sys.path.append('/home/chihiro/.pyenv/versions/3.6.7/lib/python36.zip')
+
 from websocket_server import WebsocketServer
 import base64
 import numpy as np
